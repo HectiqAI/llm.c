@@ -76,6 +76,13 @@ Allay
 ---
 ```
 
+## CUDANN
+
+For CUDA builds (especially `train_gpt2cu` with `USECUDNN=1`), the makefile will assume that the `cudann-frontend` package is accessible in the `llm.c` repo. Simply run the following command if you would like to use `cudnn`:
+```bash
+git clone git@github.com:NVIDIA/cudnn-frontend.git
+```
+
 ## datasets
 
 The data files inside `/dev/data/(dataset).py` are responsible for downloading, tokenizing and saving the tokens to .bin files, readable easily from C. So for example when you run:
