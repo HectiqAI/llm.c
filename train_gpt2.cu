@@ -1473,27 +1473,44 @@ void load_state(int *step, GPT2 *model, DataLoader *loader, const char *filename
     }
 
     // revive the DataLoader object and its state
-    loader->should_shuffle = should_shuffle;
-    if (should_shuffle == 1)
+    try
     {
-        // ensure the number of shards matches
-        size_t glob_result_gl_pathc;
-        freadCheck(&glob_result_gl_pathc, sizeof(size_t), 1, state_file);
-        assert(glob_result_gl_pathc == loader->glob_result.gl_pathc);
-        // read the shard indices
-        loader->shard_indices = (int *)mallocCheck(loader->glob_result.gl_pathc * sizeof(int));
-        freadCheck(loader->shard_indices, sizeof(int), loader->glob_result.gl_pathc, state_file);
-        // ensure the number of samples matches
-        size_t shard_num_samples;
-        freadCheck(&shard_num_samples, sizeof(size_t), 1, state_file);
-        assert(shard_num_samples == loader->shard_num_samples);
-        // read the intra-shard indices
-        loader->intra_shard_indices = (int *)mallocCheck(loader->shard_num_samples * sizeof(int));
-        freadCheck(loader->intra_shard_indices, sizeof(int), loader->shard_num_samples, state_file);
-        // read the shuffle rng state
-        freadCheck(&loader->shuffle_rng, sizeof(mt19937_state), 1, state_file);
+        loader->should_shuffle = should_shuffle;
+        if (should_shuffle == 1)
+        {
+            // ensure the number of shards matches
+            size_t glob_result_gl_pathc;
+            freadCheck(&glob_result_gl_pathc, sizeof(size_t), 1, state_file);
+            // assert(glob_result_gl_pathc == loader->glob_result.gl_pathc);
+            if (glob_result_gl_pathc != loader->glob_result.gl_pathc)
+            {
+                throw std::runtime_error("Number of shards in DataLoader state does not match current DataLoader state.");
+            }
+            // read the shard indices
+            loader->shard_indices = (int *)mallocCheck(loader->glob_result.gl_pathc * sizeof(int));
+            freadCheck(loader->shard_indices, sizeof(int), loader->glob_result.gl_pathc, state_file);
+            // ensure the number of samples matches
+            size_t shard_num_samples;
+            freadCheck(&shard_num_samples, sizeof(size_t), 1, state_file);
+            // assert(shard_num_samples == loader->shard_num_samples);
+            if (shard_num_samples != loader->shard_num_samples)
+            {
+                throw std::runtime_error("Number of samples in DataLoader state does not match current DataLoader state.");
+            }
+            // read the intra-shard indices
+            loader->intra_shard_indices = (int *)mallocCheck(loader->shard_num_samples * sizeof(int));
+            freadCheck(loader->intra_shard_indices, sizeof(int), loader->shard_num_samples, state_file);
+            // read the shuffle rng state
+            freadCheck(&loader->shuffle_rng, sizeof(mt19937_state), 1, state_file);
+        }
+        dataloader_resume(loader, current_shard_idx, current_sample_idx);
     }
-    dataloader_resume(loader, current_shard_idx, current_sample_idx);
+    // catch the assertion errors
+    catch (const std::exception &e)
+    {
+        // continue if we can't resume the dataloader, but print a warning
+        printf0("Warning: Could not resume DataLoader state: %s\n", e.what());
+    }
 
     // all done, close state file
     fcloseCheck(state_file);
@@ -1542,7 +1559,7 @@ void delete_checkpoint(const char *output_log_dir, int step, MultiGpuConfig *mul
     }
 }
 
-#ifndef TESTING
+// #ifndef TESTING
 // if we are TESTING (see test_gpt2.cu), we'll skip everything below this point
 
 // ----------------------------------------------------------------------------
@@ -1652,8 +1669,10 @@ int main(int argc, char *argv[])
     char nccl_init_method[256] = "mpi"; // "tcp" or "fs" or "mpi"
     char server_ip[256] = "";           // used if init_method set to "tcp" -> set to your server ip address
     char fs_path[256] = "";             // used if init_method set to "fs" -> set to a shared filesystem path
+
     for (int i = 1; i < argc; i += 2)
     {
+        printf("arg i=%d: param=%s value=%s\n", i, argv[i], argv[i + 1]);
         if (i + 1 >= argc)
         {
             error_usage();
@@ -2118,6 +2137,7 @@ int main(int argc, char *argv[])
             {
                 gen_tokens[i] = eot_token;
             }
+            printf("eot_token: %d\n", eot_token);
             // now sample from the model autoregressively
             printf("generating:---");
             for (int t = 1; t < genT; t++)
@@ -2286,4 +2306,4 @@ int main(int argc, char *argv[])
     printf0("End of training\n");
     return 0;
 }
-#endif
+// #endif

@@ -5,9 +5,10 @@
 # on 8X A100 80GB SXM ($14/hr) steps in ~300ms/iter
 # => training time 18,865 * 300ms = 94.3 min ~= $20
 
+cd /home/cmurphy/repos/llm.c
 make train_gpt2cu USE_CUDNN=1
 out_dir="/home/cmurphy/experiments/gencity/train-nyc-llm"
-done_file="$out_dir/DONE_00018865"
+done_file="$out_dir/DONE_00050000"
 
 # in case the training stalls or crashes, loop to resume (-y 1)
 while true; do
@@ -39,28 +40,26 @@ while true; do
     # -n: checkpoint_every
     # -y: resume training
     # -e: input .bin filename or descriptor
-
-
-
+    
     mpirun -np 1 /home/cmurphy/repos/llm.c/train_gpt2cu \
-                -i "/home/cmurphy/datasets/gencity/nyc-tokens-gcp/nyc-tokens-*.bin" \
-                -j "/home/cmurphy/datasets/gencity/nyc-tokens-gcp/nyc-val-tokens.bin" \
-                -tp "/home/cmurphy/datasets/gencity/nyc-tokens-gcp/tokenizer.bin" \
-                -o $out_dir \
-                -v 250 -s 200 -g 144 \
-                -h 0 \
-                -b 24 -t 2048\
-                -d 786432 \
-                -r 0 \
-                -z 1 \
-                -c 0.1 \
-                -l 0.0006 \
-                -q 0.0 \
-                -u 700 \
-                -n 1000 \
-                -y 1 \
-		-x 50000\
-                -e "gpt3:c768" > $out_dir/train.log 2>&1
+            -i "/home/cmurphy/datasets/gencity/nyc-tokens-gcp-2/nyc-tokens-*.bin" \
+            -j "/home/cmurphy/datasets/gencity/nyc-tokens-gcp-2/nyc-val-tokens.bin" \
+            -tp "/home/cmurphy/datasets/gencity/nyc-tokens-gcp-2/tokenizer.bin" \
+            -o $out_dir \
+            -v 250 -s 200 -g 144 \
+            -h 0 \
+            -b 24 -t 2048\
+            -d 786432 \
+            -r 0 \
+            -z 1 \
+            -c 0.1 \
+            -l 0.0006 \
+            -q 0.0 \
+            -u 700 \
+            -n 1000 \
+            -y 1 \
+            -x 50000\
+            -e "gpt3:c768" > $out_dir/train.log 2>&1
 
     sleep 1
     break
